@@ -6,6 +6,7 @@ export default {
       colors: {
         "dark-bg-blue": "#123",
         "light-bg-blue": "#234",
+        "cool-white": "#faebd7",
       },
     },
   },
