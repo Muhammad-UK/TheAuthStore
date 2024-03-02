@@ -1,25 +1,34 @@
 import { useEffect, useState } from "react";
+import { Favorite, Product, User, loginFn } from "../../server/src/types";
 import "./App.css";
-import { Favorite, Product, User } from "../../server/src/types";
+import { Login } from "./Login";
 
 function App() {
-  const [users, setUsers] = useState<User[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [auth, setAuth] = useState<User>();
 
+  const attemptLoginWithToken = async () => {
+    const token = window.localStorage.getItem("token");
+    if (token) {
+      const response = await fetch("/api/auth/me", {
+        headers: {
+          authorization: token,
+        },
+      });
+      const json = await response.json();
+      if (response.ok) {
+        setAuth(json as User);
+      } else {
+        window.localStorage.removeItem("token");
+      }
+    }
+  };
   useEffect(() => {
-    const fetchUsers = async () => {
-      const response = await fetch("/api/users");
-      const json = await response.json();
-      setUsers(json as User[]);
-    };
-    fetchUsers();
-    users.forEach(async (user) => {
-      const response = await fetch(`/api/users/${user.id}/favorites`);
-      const json = await response.json();
-      setFavorites(json as Favorite[]);
-    });
+    attemptLoginWithToken();
   }, []);
+
+  // FETCH useEffects
   useEffect(() => {
     const fetchProducts = async () => {
       const response = await fetch("/api/products");
@@ -28,98 +37,117 @@ function App() {
     };
     fetchProducts();
   }, []);
-  console.log(users);
-  console.log(favorites);
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      const response = await fetch(`/api/users/${auth?.id}/favorites`);
+      const json = await response.json();
+      if (response.ok) {
+        setFavorites(json as Favorite[]);
+      }
+    };
+    if (auth && auth.id) {
+      fetchFavorites();
+    } else {
+      setFavorites([]);
+    }
+  }, [auth]);
 
+  const login: loginFn = async (userCredentials?: User) => {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(userCredentials),
+    });
+    const json = await response.json();
+    if (response.ok) {
+      window.localStorage.setItem("token", json.token);
+      attemptLoginWithToken();
+    } else {
+      console.log(json);
+    }
+  };
+  const logout = async () => {
+    window.localStorage.removeItem("token");
+    setAuth(undefined);
+  };
+  const addFavorite = async ({ id }: Product) => {
+    const response = await fetch(`/api/users/${auth?.id}/favorites`, {
+      method: "POST",
+      body: JSON.stringify({ product_id: id }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    const json = await response.json();
+    if (response.ok) {
+      setFavorites([...favorites, json]);
+    } else {
+      console.log(json);
+    }
+  };
+  const removeFavorite = async ({ id }: Favorite) => {
+    const response = await fetch(`/api/users/${auth?.id}/favorites/${id}`, {
+      method: "DELETE",
+    });
+    if (response.ok) {
+      setFavorites(favorites.filter((favorite) => favorite.id !== id));
+    } else {
+      console.log(response);
+    }
+  };
   return (
-    <div className="px-16 py-8 text-2xl justify-center flex flex-wrap gap-4 w-full lg:px-32 lg:py-16 lg:text-4xl ">
-      <div className="flex-1 space-y-2">
-        <h1 className="border-violet-700 border-solid border-4 p-4">Users</h1>
+    <div className="px-16 py-8 text-2xl justify-center flex flex-wrap gap-4 w-full lg:px-32 lg:py-16 lg:text-4xl">
+      {!auth?.id ? (
+        <Login login={login} />
+      ) : (
+        <div className="bg-slate-900 px-6 py-2 rounded-lg shadow-lg">
+          <button
+            className="hover:bg-slate-800 h-16 rounded p-2 py-60"
+            onClick={logout}
+          >
+            Welcome, {auth?.username}
+            <br />
+            Logout
+          </button>
+        </div>
+      )}
+      <div className="flex-1 space-y-2 max-w-xl">
+        <h1 className="border-violet-700 border-solid border-4 p-4">
+          Products
+        </h1>
         <ul className="border-violet-700 border-solid border-2 p-2 bg-darker-blue">
-          {users.map((user) => {
-            return (
-              <>
-                <li className="p-2 border-b-2 border-gray-200" key={user.id}>
-                  {user.username}
-                  <span>'s Favorites:</span>
-                </li>
-                <ul className="pl-4">
-                  {favorites.map((favorite) => {
-                    if (favorite.user_id === user.id) {
-                      return (
-                        <li className="text-cyan-700" key={favorite.id}>
-                          {
-                            products.find(
-                              (product) => product.id === favorite.product_id
-                            )?.name
-                          }
-                        </li>
-                      );
-                    }
-                  })}
-                </ul>
-              </>
-            );
-          })}
-        </ul>
-        <form className="bg-slate-900 px-6 py-2 rounded-lg shadow-lg">
-          <div className="mb-4">
-            <label className="block text-xl mb-2">
-              Username:
-              <input
-                className="bg-transparent shadow appearance-none border rounded w-full py-2 px-3"
-                type="text"
-                name="username"
-              />
-            </label>
-            <div className="mb-6">
-              <label className="block text-xl mb-2">
-                Password:
-                <input
-                  className="bg-transparent shadow appearance-none border rounded w-full py-2 px-3"
-                  type="text"
-                  name="password"
-                />
-              </label>
-            </div>
-            <div className="flex items-center justify-center">
-              <button
-                className="hover:bg-slate-600 text-2xl font-bold px-4 rounded"
-                type="submit"
-              >
-                Add User
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-      <div className="flex-1 space-y-2">
-        <form className="bg-slate-900 px-6 py-2 rounded-lg shadow-lg">
-          <div className="mb-4">
-            <label className="block text-xl mb-2">
-              Product Name:
-              <input
-                className="bg-transparent shadow appearance-none border rounded w-full py-2 px-3"
-                type="text"
-                name="product name"
-              />
-            </label>
-            <div className="flex items-center justify-center">
-              <button
-                className="hover:bg-slate-600 text-2xl font-bold px-4 rounded"
-                type="submit"
-              >
-                Add Product
-              </button>
-            </div>
-          </div>
-        </form>
-        <h1 className="border-pink-600 border-solid border-4 p-4">Products</h1>
-        <ul className="border-pink-600 border-solid border-2 p-2">
           {products.map((product) => {
+            const isFavorite = favorites.find(
+              (favorite) => favorite.product_id === product.id
+            );
             return (
-              <li className="p-2 border-b-2 border-gray-200" key={product.id}>
+              <li
+                key={product.id}
+                className={
+                  isFavorite
+                    ? "border-cyan-500 border-2 m-1 p-1 max-w-64"
+                    : "border-rose-500 border-2 m-1 p-1 max-w-64"
+                }
+              >
                 {product.name}
+                {auth?.id && isFavorite && (
+                  <button
+                    className="hover:bg-slate-700 px-1 rounded"
+                    onClick={() => removeFavorite(isFavorite)}
+                  >
+                    -
+                  </button>
+                )}
+                {auth?.id && !isFavorite && (
+                  <button
+                    className="hover:bg-slate-700 px-1 rounded"
+                    onClick={() => addFavorite(product)}
+                  >
+                    +
+                  </button>
+                )}
               </li>
             );
           })}

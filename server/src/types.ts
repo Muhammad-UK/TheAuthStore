@@ -15,3 +15,7 @@ export type Favorite = {
 export interface TError extends Error {
   status: number;
 }
+export type loginFn = (user?: User) => void;
+export type loginObj = {
+  login: loginFn;
+};
