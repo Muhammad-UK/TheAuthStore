@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  ErrorHandler,
   Favorite,
   Product,
   User,
@@ -13,6 +14,7 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [auth, setAuth] = useState<User>();
+  const [error, setError] = useState<ErrorHandler>();
 
   const attemptLoginWithToken = async () => {
     const token = window.localStorage.getItem("token");
@@ -71,11 +73,12 @@ function App() {
       body: JSON.stringify(userCredentials),
     });
     const json = await response.json();
-    if (response.ok) {
+    if (!response.ok) {
+      setError({ message: "Login Error" });
+    } else {
       window.localStorage.setItem("token", json.token);
       attemptLoginWithToken();
-    } else {
-      console.log(json);
+      setError(undefined);
     }
   };
   const register: registerFn = async (userCredentials?: User) => {
@@ -87,11 +90,12 @@ function App() {
       body: JSON.stringify(userCredentials),
     });
     const json = await response.json();
-    if (response.ok) {
+    if (!response.ok) {
+      setError({ message: "Registration Error" });
+    } else {
       window.localStorage.setItem("token", json.token);
       attemptLoginWithToken();
-    } else {
-      console.log(json);
+      setError(undefined);
     }
   };
   const logout = async () => {
@@ -126,7 +130,7 @@ function App() {
   return (
     <div className="px-16 py-8 text-2xl justify-center flex flex-wrap gap-4 w-full lg:px-32 lg:py-16 lg:text-4xl">
       {!auth?.id ? (
-        <AuthForm login={login} register={register} />
+        <AuthForm login={login} register={register} error={error} />
       ) : (
         <div className="bg-slate-900 px-6 py-2 rounded-lg shadow-lg">
           <button
