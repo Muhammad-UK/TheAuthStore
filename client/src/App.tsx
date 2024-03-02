@@ -39,7 +39,11 @@ function App() {
   }, []);
   useEffect(() => {
     const fetchFavorites = async () => {
-      const response = await fetch(`/api/users/${auth?.id}/favorites`);
+      const response = await fetch(`/api/users/${auth?.id}/favorites`, {
+        headers: {
+          authorization: window.localStorage.getItem("token")!,
+        },
+      });
       const json = await response.json();
       if (response.ok) {
         setFavorites(json as Favorite[]);
@@ -78,6 +82,7 @@ function App() {
       body: JSON.stringify({ product_id: id }),
       headers: {
         "Content-Type": "application/json",
+        authorization: window.localStorage.getItem("token")!,
       },
     });
     const json = await response.json();
@@ -88,14 +93,13 @@ function App() {
     }
   };
   const removeFavorite = async ({ id }: Favorite) => {
-    const response = await fetch(`/api/users/${auth?.id}/favorites/${id}`, {
+    await fetch(`/api/users/${auth?.id}/favorites/${id}`, {
       method: "DELETE",
+      headers: {
+        authorization: window.localStorage.getItem("token")!,
+      },
     });
-    if (response.ok) {
-      setFavorites(favorites.filter((favorite) => favorite.id !== id));
-    } else {
-      console.log(response);
-    }
+    setFavorites(favorites.filter((favorite) => favorite.id !== id));
   };
   return (
     <div className="px-16 py-8 text-2xl justify-center flex flex-wrap gap-4 w-full lg:px-32 lg:py-16 lg:text-4xl">

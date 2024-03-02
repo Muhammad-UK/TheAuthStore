@@ -1,4 +1,4 @@
-import express from "express";
+import express, { NextFunction } from "express";
 import {
   authenticate,
   client,
@@ -12,15 +12,32 @@ import {
   fetchUsers,
   findUserWithToken,
 } from "./db";
-import { Favorite, Product, User } from "./types";
+import { Favorite, Product, TError, User } from "./types";
 import path from "path";
 
 const app = express();
 app.use(express.json());
 
+// Production Route:
 app.get("/", (req, res) =>
   res.sendFile(path.join(__dirname, "../../client/dist/index.html"))
 );
+
+// Helper Function:
+const isLoggedIn = async (req: any, res: any, next: any) => {
+  try {
+    req.user = await findUserWithToken(req.headers.authorization!);
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Error Handling:
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error(err.message);
+  res.status(500).send("Server Error");
+});
 
 // GET Routes:
 app.get("/api/users", async (req, res, next) => {
@@ -37,16 +54,27 @@ app.get("/api/products", async (req, res, next) => {
     next(error);
   }
 });
-app.get("/api/users/:user_id/favorites", async (req, res, next) => {
-  try {
-    res.send(await fetchFavorites(req.params.user_id));
-  } catch (error) {
-    next(error);
+app.get(
+  "/api/users/:user_id/favorites",
+  isLoggedIn,
+  async (req: any, res, next) => {
+    try {
+      if (req.params.user_id !== req.user.id) {
+        const error: TError = {
+          message: "Not Authorized",
+          status: 401,
+        } as TError;
+        throw error;
+      }
+      res.send(await fetchFavorites(req.params.user_id));
+    } catch (error) {
+      next(error);
+    }
   }
-});
-app.get("/api/auth/me", async (req, res, next) => {
+);
+app.get("/api/auth/me", isLoggedIn, async (req: any, res, next) => {
   try {
-    res.send(await findUserWithToken(req.headers.authorization));
+    res.send(req.user);
   } catch (error) {
     next(error);
   }
@@ -74,8 +102,15 @@ app.post("/api/products", async (req, res, next) => {
     next(error);
   }
 });
-app.post("/api/users/:user_id/favorites", async (req, res, next) => {
+app.post("/api/users/:user_id/favorites", async (req: any, res, next) => {
   try {
+    if (req.params.user_id !== req.user.id) {
+      const error: TError = {
+        message: "Not Authorized",
+        status: 401,
+      } as TError;
+      throw error;
+    }
     const newFavorite: Favorite = {
       user_id: req.params.user_id,
       product_id: req.body.product_id,
@@ -96,8 +131,15 @@ app.post("/api/auth/login", async (req, res, next) => {
 // DELETE Route:
 app.delete(
   "/api/users/:user_id/favorites/:favorite_id",
-  async (req, res, next) => {
+  async (req: any, res, next) => {
     try {
+      if (req.params.user_id !== req.favorite_id) {
+        const error: TError = {
+          message: "Not Authorized",
+          status: 401,
+        } as TError;
+        throw error;
+      }
       await deleteFavorite(req.params.favorite_id, req.params.user_id);
       res.sendStatus(204);
     } catch (error) {

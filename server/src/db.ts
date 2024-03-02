@@ -2,6 +2,9 @@ import pg from "pg";
 import { v4 as uuidv4 } from "uuid";
 import { Favorite, Product, TError, User } from "./types";
 import bcrypt from "bcrypt";
+import { JwtPayload, sign, verify } from "jsonwebtoken";
+
+const JWT = process.env.JWT || "secret";
 
 export const client = new pg.Client(
   process.env.DATABASE_URL || "postgres://localhost/acme_auth_store_db"
@@ -113,23 +116,38 @@ export const deleteFavorite = async (favorite_id: string, user_id: string) => {
 
 export const authenticate = async ({ username, password }: User) => {
   const SQL = /*sql*/ `
-        SELECT id, username FROM users WHERE username = $1;
+        SELECT id, password FROM users WHERE username = $1;
     `;
   const response = await client.query(SQL, [username]);
-  if (!response.rows.length) {
+  if (
+    !response.rows.length ||
+    (await bcrypt.compare(password, response.rows[0].password)) === false
+  ) {
     const error: TError = {
       message: "Not Authorized",
       status: 401,
     } as TError;
     throw error;
   }
-  return { token: response.rows[0].id };
+  const token = sign({ id: response.rows[0].id }, JWT);
+  return { token };
 };
 
-export const findUserWithToken = async (id) => {
+export const findUserWithToken = async (token: string) => {
+  let id = "";
+  try {
+    const payload: JwtPayload | string = verify(token, JWT);
+    id = typeof payload === "string" ? "" : payload.id;
+  } catch (error) {
+    const err: TError = {
+      message: "Not Authorized",
+      status: 401,
+    } as TError;
+    throw err;
+  }
   const SQL = /*sql*/ `
         SELECT id, username FROM users WHERE id = $1;
-    `;
+  `;
   const response = await client.query(SQL, [id]);
   if (!response.rows.length) {
     const error: TError = {
