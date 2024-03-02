@@ -44,7 +44,7 @@ export const createUser = async ({
   const SQL = /*sql*/ `
     INSERT INTO users(id, username, password)
     VALUES($1, $2, $3)
-    RETURNING id, username;
+    RETURNING *;
   `;
   const response = await client.query(SQL, [
     uuidv4(),

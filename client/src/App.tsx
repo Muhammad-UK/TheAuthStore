@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { Favorite, Product, User, loginFn } from "../../server/src/types";
+import {
+  Favorite,
+  Product,
+  User,
+  loginFn,
+  registerFn,
+} from "../../server/src/types";
 import "./App.css";
-import { Login } from "./Login";
+import { AuthForm } from "./AuthForm";
 
 function App() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -72,6 +78,22 @@ function App() {
       console.log(json);
     }
   };
+  const register: registerFn = async (userCredentials?: User) => {
+    const response = await fetch("/api/users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(userCredentials),
+    });
+    const json = await response.json();
+    if (response.ok) {
+      window.localStorage.setItem("token", json.token);
+      attemptLoginWithToken();
+    } else {
+      console.log(json);
+    }
+  };
   const logout = async () => {
     window.localStorage.removeItem("token");
     setAuth(undefined);
@@ -104,7 +126,7 @@ function App() {
   return (
     <div className="px-16 py-8 text-2xl justify-center flex flex-wrap gap-4 w-full lg:px-32 lg:py-16 lg:text-4xl">
       {!auth?.id ? (
-        <Login login={login} />
+        <AuthForm login={login} register={register} />
       ) : (
         <div className="bg-slate-900 px-6 py-2 rounded-lg shadow-lg">
           <button
