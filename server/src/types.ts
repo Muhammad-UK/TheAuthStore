@@ -20,4 +20,8 @@ export type registerFn = (user?: User) => void;
 export type AuthFormProps = {
   login: loginFn;
   register: registerFn;
+  error: ErrorHandler | undefined;
+};
+export type ErrorHandler = {
+  message: string;
 };

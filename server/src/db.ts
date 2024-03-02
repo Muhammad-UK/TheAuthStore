@@ -2,7 +2,7 @@ import pg from "pg";
 import { v4 as uuidv4 } from "uuid";
 import { Favorite, Product, TError, User } from "./types";
 import bcrypt from "bcrypt";
-import { JwtPayload, sign, verify } from "jsonwebtoken";
+const jwt = require("jsonwebtoken");
 
 const JWT = process.env.JWT || "secret";
 
@@ -105,13 +105,22 @@ export const fetchFavorites = async (user_id: string): Promise<Favorite[]> => {
 
 export const deleteFavorite = async (favorite_id: string, user_id: string) => {
   // Just having some fun with syntax
-  await client.query(
+  const response = await client.query(
     /*sql*/ `
   DELETE FROM favorites
-  WHERE id = $1 AND user_id = $2;
+  WHERE id = $1 AND user_id = $2
+  RETURNING *;
 `,
     [favorite_id, user_id]
   );
+  if (response.rows.length === 0) {
+    const error: TError = {
+      message: "Favorite not found",
+      status: 401,
+    } as TError;
+    throw error;
+  }
+  return response.rows[0];
 };
 
 export const authenticate = async ({ username, password }: User) => {
@@ -129,14 +138,14 @@ export const authenticate = async ({ username, password }: User) => {
     } as TError;
     throw error;
   }
-  const token = sign({ id: response.rows[0].id }, JWT);
+  const token = jwt.sign({ id: response.rows[0].id }, JWT);
   return { token };
 };
 
 export const findUserWithToken = async (token: string) => {
   let id = "";
   try {
-    const payload: JwtPayload | string = verify(token, JWT);
+    const payload = jwt.verify(token, JWT);
     id = typeof payload === "string" ? "" : payload.id;
   } catch (error) {
     const err: TError = {

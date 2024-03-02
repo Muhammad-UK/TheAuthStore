@@ -1,4 +1,4 @@
-import express, { NextFunction } from "express";
+import express from "express";
 import {
   authenticate,
   client,
@@ -14,7 +14,6 @@ import {
 } from "./db";
 import { Favorite, Product, TError, User } from "./types";
 import path from "path";
-import { Console } from "console";
 
 const app = express();
 app.use(express.json());
@@ -34,12 +33,6 @@ const isLoggedIn = async (req: any, res: any, next: any) => {
     next(error);
   }
 };
-
-// Error Handling:
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error(err.message);
-  res.status(500).send("Server Error");
-});
 
 // GET Routes:
 app.get("/api/users", async (req, res, next) => {
@@ -148,7 +141,7 @@ app.delete(
   isLoggedIn,
   async (req: any, res, next) => {
     try {
-      if (req.params.user_id !== req.favorite_id) {
+      if (req.params.user_id !== req.user.id) {
         const error: TError = {
           message: "Not Authorized",
           status: 401,
@@ -210,5 +203,13 @@ const init = async () => {
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log(`Listening on port ${port}`));
 };
+
+// Error Handling:
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error(err.message);
+  res
+    .status(err.status || 500)
+    .send({ message: err.message } || "Server Error");
+});
 
 init();
